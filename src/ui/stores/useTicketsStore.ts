@@ -169,32 +169,41 @@ export const useTicketsStore = defineStore('tickets', {
     },
 
     /**
-     * Cierra todos los acordeones visibles (solo modo multiple)
+     * Cierra todos los acordeones (solo modo multiple)
+     * Como openIds solo contiene visibles, simplemente los limpia todos
      */
     closeAllVisible() {
       if (this.mode !== 'multiple') return
-
-      const visibleIds = new Set(this.filtered.map(t => t.id))
       
-      // Remover solo los IDs que están visibles
-      for (const id of this.openIds) {
-        if (visibleIds.has(id)) {
-          this.openIds.delete(id)
-        }
-      }
+      // En modo multiple, openIds solo contiene IDs visibles
+      // gracias a ensureOpenWhenListChanges(), así que podemos limpiar todos
+      this.openIds.clear()
     },
 
     /**
      * Asegura que haya acordeones abiertos según el modo.
      * - Single: siempre uno abierto si hay tickets visibles
-     * - Multiple: mantiene los abiertos que siguen visibles
+     * - Multiple: limpia los no visibles, y si no queda ninguno abierto, abre el primero
      */
     ensureOpenWhenListChanges() {
       const filtered = this.filtered
+      const visibleIds = new Set(filtered.map(t => t.id))
 
       if (this.mode === 'multiple') {
-        // En modo multiple, no forzar apertura
-        // Solo mantener los que están visibles
+        // En modo multiple, remover los IDs que ya no son visibles
+        // Solo mantener los abiertos que siguen siendo visibles
+        for (const id of this.openIds) {
+          if (!visibleIds.has(id)) {
+            this.openIds.delete(id)
+          }
+        }
+        
+        // Si después del filtro no hay ninguno abierto y hay tickets visibles,
+        // abrir el primero automáticamente
+        if (this.openIds.size === 0 && filtered.length > 0) {
+          this.openIds.add(filtered[0].id)
+        }
+        
         return
       }
 

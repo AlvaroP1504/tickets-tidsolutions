@@ -171,6 +171,12 @@ describe('useTicketsStore', () => {
       store.toggleOpen(ticket1.id)
       store.toggleOpen(ticket2.id)
       store.toggleOpen(ticket3.id)
+      console.log('store.sorted')
+      console.log(store.sorted)
+      console.log('store.openIds')
+      console.log(store.openIds)
+      console.log(store.openIds.size)
+      console.log(store.visibleOpenIds)
       
       expect(store.openIds.size).toBe(3)
       expect(store.openIds.has(ticket1.id)).toBe(true)
@@ -203,7 +209,7 @@ describe('useTicketsStore', () => {
       expect(store.openIds.size).toBe(0)
     })
 
-    it('cierra solo los acordeones visibles con closeAllVisible', async () => {
+    it('cierra todos los acordeones con closeAllVisible', async () => {
       const store = useTicketsStore()
       
       await store.load()
@@ -216,21 +222,14 @@ describe('useTicketsStore', () => {
       store.toggleOpen(ticket1.id)
       store.toggleOpen(ticket2.id)
       
-      // Filtrar para que solo uno sea visible
-      const ticket1Title = ticket1.title.split(' ')[0]
-      store.setQuery(ticket1Title)
+      expect(store.openIds.size).toBe(2)
       
-      // Cerrar todos los visibles
+      // Cerrar todos
       store.closeAllVisible()
       
-      // El ticket visible debe estar cerrado
+      // Todos deben estar cerrados
+      expect(store.openIds.size).toBe(0)
       expect(store.visibleOpenIds.length).toBe(0)
-      
-      // Pero el no visible sigue marcado como abierto
-      // (aparecerá abierto cuando vuelva a ser visible)
-      if (!store.filtered.some(t => t.id === ticket2.id)) {
-        expect(store.openIds.has(ticket2.id)).toBe(true)
-      }
     })
 
     it('mantiene acordeones abiertos al filtrar si siguen visibles', async () => {
@@ -254,7 +253,7 @@ describe('useTicketsStore', () => {
       expect(store.visibleOpenIds.length).toBe(2)
     })
 
-    it('preserva acordeones ocultos al filtrar', async () => {
+    it('NO preserva acordeones ocultos al filtrar (solo mantiene visibles)', async () => {
       const store = useTicketsStore()
       
       await store.load()
@@ -273,20 +272,98 @@ describe('useTicketsStore', () => {
         // Filtrar solo por Safari
         store.setQuery('Safari')
         
-        // Solo Safari debe ser visible
+        // Solo Safari debe estar visible y abierto
         expect(store.visibleOpenIds).toContain(safariTicket.id)
         expect(store.visibleOpenIds).not.toContain(otherTicket.id)
         
-        // Pero ambos deben seguir en openIds (persistencia)
+        // El ticket no visible debe haberse eliminado de openIds
         expect(store.openIds.has(safariTicket.id)).toBe(true)
-        expect(store.openIds.has(otherTicket.id)).toBe(true)
+        expect(store.openIds.has(otherTicket.id)).toBe(false)
+        expect(store.openIds.size).toBe(1)
         
-        // Al limpiar filtro, ambos vuelven a aparecer abiertos
+        // Al limpiar filtro, solo Safari sigue abierto (el que estaba visible en el filtro)
         store.setQuery('')
-        expect(store.visibleOpenIds.length).toBe(2)
+        expect(store.visibleOpenIds.length).toBe(1)
         expect(store.visibleOpenIds).toContain(safariTicket.id)
-        expect(store.visibleOpenIds).toContain(otherTicket.id)
+        expect(store.visibleOpenIds).not.toContain(otherTicket.id)
       }
+    })
+
+    it('escenario: A y B abiertos, filtro A, limpio filtro, solo A queda abierto', async () => {
+      const store = useTicketsStore()
+      
+      await store.load()
+      store.setMode('multiple')
+      
+      // Nombrar como A y B para claridad
+      const ticketA = store.sorted[0]
+      const ticketB = store.sorted[1]
+      
+      // Paso 1: Abrir A y B
+      store.toggleOpen(ticketA.id)
+      store.toggleOpen(ticketB.id)
+      expect(store.openIds.size).toBe(2)
+      expect(store.openIds.has(ticketA.id)).toBe(true)
+      expect(store.openIds.has(ticketB.id)).toBe(true)
+      
+      // Paso 2: Filtrar para que solo aparezca A
+      const ticketATitleWord = ticketA.title.split(' ')[0]
+      store.setQuery(ticketATitleWord)
+      
+      // Verificar que solo A es visible
+      const isAVisible = store.filtered.some(t => t.id === ticketA.id)
+      const isBVisible = store.filtered.some(t => t.id === ticketB.id)
+      
+      if (isAVisible && !isBVisible) {
+        // A está visible, B no
+        expect(store.visibleOpenIds).toContain(ticketA.id)
+        expect(store.visibleOpenIds).not.toContain(ticketB.id)
+        
+        // B debe haberse eliminado de openIds
+        expect(store.openIds.has(ticketA.id)).toBe(true)
+        expect(store.openIds.has(ticketB.id)).toBe(false)
+        
+        // Paso 3: Limpiar filtro
+        store.setQuery('')
+        
+        // Solo A debe seguir abierto
+        expect(store.visibleOpenIds.length).toBe(1)
+        expect(store.visibleOpenIds).toContain(ticketA.id)
+        expect(store.visibleOpenIds).not.toContain(ticketB.id)
+        expect(store.openIds.size).toBe(1)
+      }
+    })
+
+    it('abre automáticamente el primero si no hay ninguno abierto después de filtrar', async () => {
+      const store = useTicketsStore()
+      
+      await store.load()
+      store.setMode('multiple')
+      
+      // Cerrar todos los acordeones
+      store.closeAllVisible()
+      expect(store.openIds.size).toBe(0)
+      
+      // Filtrar
+      store.setQuery('Safari')
+      
+      // Debe abrir automáticamente el primero visible
+      if (store.filtered.length > 0) {
+        expect(store.visibleOpenIds.length).toBe(1)
+        expect(store.visibleOpenIds[0]).toBe(store.filtered[0].id)
+      }
+    })
+
+    it('abre el primero al cargar en modo multiple sin abiertos', async () => {
+      const store = useTicketsStore()
+      store.setMode('multiple')
+      
+      await store.load()
+      
+      // Debe abrir el primero automáticamente
+      expect(store.openIds.size).toBeGreaterThan(0)
+      expect(store.visibleOpenIds.length).toBe(1)
+      expect(store.visibleOpenIds[0]).toBe(store.sorted[0].id)
     })
   })
 
