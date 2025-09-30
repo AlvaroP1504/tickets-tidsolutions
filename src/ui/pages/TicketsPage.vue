@@ -6,9 +6,43 @@
       </v-col>
     </v-row>
 
-    <v-row>
-      <v-col cols="12" md="8" lg="6">
+    <v-row align="center">
+      <v-col cols="12" md="6" lg="5">
         <SearchBar v-model="ticketsStore.query" />
+      </v-col>
+      
+      <v-col cols="12" md="6" lg="4">
+        <div class="controls-wrapper">
+          <v-btn-toggle
+            :model-value="ticketsStore.mode"
+            mandatory
+            color="primary"
+            variant="outlined"
+            divided
+            density="comfortable"
+            @update:model-value="ticketsStore.setMode($event)"
+          >
+            <v-btn value="single">
+              <v-icon start>mdi-numeric-1-box</v-icon>
+              Single
+            </v-btn>
+            <v-btn value="multiple">
+              <v-icon start>mdi-format-list-checkbox</v-icon>
+              Multiple
+            </v-btn>
+          </v-btn-toggle>
+
+          <v-btn
+            v-if="ticketsStore.mode === 'multiple' && ticketsStore.visibleOpenIds.length > 0"
+            color="error"
+            variant="tonal"
+            density="comfortable"
+            @click="ticketsStore.closeAllVisible()"
+          >
+            <v-icon start>mdi-close-box-multiple</v-icon>
+            Cerrar todos
+          </v-btn>
+        </div>
       </v-col>
     </v-row>
 
@@ -33,7 +67,8 @@
         <!-- Tickets list -->
         <v-expansion-panels
           v-else
-          v-model="openPanelIndex"
+          v-model="openPanelIndices"
+          :multiple="ticketsStore.mode === 'multiple'"
           variant="accordion"
           class="tickets-accordion"
         >
@@ -56,22 +91,22 @@ import TicketItem from '../components/TicketItem.vue'
 
 const ticketsStore = useTicketsStore()
 
-// El índice del panel abierto (basado en visibleOpenId)
-const openPanelIndex = computed({
+// Índices de los paneles abiertos (sincronizado con Vuetify)
+const openPanelIndices = computed({
   get() {
-    const openId = ticketsStore.visibleOpenId
-    if (!openId) return undefined
-
-    const index = ticketsStore.filtered.findIndex(t => t.id === openId)
-    return index >= 0 ? index : undefined
-  },
-  set(index: number | undefined) {
-    if (index !== undefined && index >= 0) {
-      const ticket = ticketsStore.filtered[index]
-      if (ticket) {
-        ticketsStore.toggleOpen(ticket.id)
-      }
+    const indices = ticketsStore.openPanelIndices
+    
+    // Vuetify espera:
+    // - number | undefined en modo single
+    // - number[] | undefined en modo multiple
+    if (ticketsStore.mode === 'single') {
+      return indices.length > 0 ? indices[0] : undefined
+    } else {
+      return indices
     }
+  },
+  set(value: number | number[] | undefined) {
+    ticketsStore.setOpenIndices(value)
   }
 })
 
@@ -124,5 +159,18 @@ watch(
 
 .tickets-accordion {
   margin-top: 16px;
+}
+
+.controls-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 960px) {
+  .controls-wrapper {
+    justify-content: flex-start;
+  }
 }
 </style>
