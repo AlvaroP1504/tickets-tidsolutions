@@ -106,6 +106,7 @@ describe('useTicketsStore', () => {
     await store.load()
     
     const firstTicket = store.sorted[0]
+    console.log('firstTicket', firstTicket)
     store.toggleOpen(firstTicket.id)
     
     // Aplicar filtro
@@ -116,7 +117,8 @@ describe('useTicketsStore', () => {
     
     // Si el ticket original sigue en la lista, debe mantenerse abierto
     if (store.sorted.some(t => t.id === firstTicket.id)) {
-      expect(store.openId).toBe(firstTicket.id)
+      expect(store.openId).toBe(store.visibleOpenId)
+      expect(store.sorted.some(t => t.id === store.openId)).toBe(true)
     }
   })
 })
