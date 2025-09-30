@@ -15,7 +15,9 @@
         </div>
         <div class="detail-row description-row">
           <span class="detail-label">Descripción:</span>
-          <p class="detail-value description-text">{{ ticket.description }}</p>
+          <p class="detail-value description-text">
+            {{ ticket.description }}
+          </p>
         </div>
       </div>
     </v-expansion-panel-text>
